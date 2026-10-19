@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESG 企業合規與永續路徑索引工具 (2026 法規標準)</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React & React DOM CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <!-- Babel CDN for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            forest: {
+              50: '#f2f7f4',
+              100: '#e1ede6',
+              600: '#2d6a4f',
+              700: '#1b4332',
+              800: '#081c15',
+            },
+            sage: '#74c69d',
+            warmbg: '#f8f9fa',
+            wood: '#f4f1ea',
+            amberalert: '#d97706'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background-color: #f8f9fa; color: #1b4332; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    .print-hide { @media print { display: none !important; } }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    function ESGApp() {
+      // 1. 下拉篩選狀態
+      const [orgType, setOrgType] = useState('listed_main');
+      const [capital, setCapital] = useState('100up');
+      const [industry, setIndustry] = useState('steel');
+      const [envListed, setEnvListed] = useState('yes');
+      const [euExport, setEuExport] = useState('cbam');
+
+      // 2. 核心邏輯計算與甘特圖欄位對應
+      const result = useMemo(() => {
+        const isSteelOrCement = ['steel', 'cement'].includes(industry);
+        const isSpecialIndustry = ['food', 'chemical', 'finance'].includes(industry);
+        const isListed = ['listed_main', 'listed_otc'].includes(orgType);
+
+        // 永續報告書申報時間與規範
+        let reportDeadline = "";
+        let reportDetails = "";
+        
+        if (isListed) {
+          if (capital !== '20under' || isSpecialIndustry) {
+            reportDeadline = "每年 6 月 30 日前";
+            reportDetails = "強制申報。須參考 GRI 準則、揭露 TCFD 氣候資訊，並【強制加揭 SASB 產業指標】。";
+          } else {
+            reportDeadline = "每年 8 月 31 日前";
+            reportDetails = "強制申報。須參考 GRI 準則及揭露 TCFD 氣候資訊（SASB 為自願或彈性揭露）。";
+          }
+        } else {
+          reportDeadline = "非強制（建議自願申報）";
+          reportDetails = "未上市櫃公司無金管會強制規範，但配合供應鏈要求建議參照 GRI 框架。";
+        }
+
+        if (industry === 'finance' && isListed) {
+          reportDetails += " [金融業特有] 須額外範疇三投融資碳排放盤查 (PCAF)。";
+        }
+
+        // 金管會盤查與確信時程 (文字)
+        let inventoryYear = "";
+        let assuranceYear = "";
+        if (isListed) {
+          if (isSteelOrCement || capital === '100up') {
+            inventoryYear = "個體 2023 / 子公司 2025";
+            assuranceYear = "個體 2024 / 子公司 2027";
+          } else if (capital === '50to100') {
+            inventoryYear = "個體 2025 / 子公司 2026";
+            assuranceYear = "個體 2026 / 子公司 2028";
+          } else {
+            inventoryYear = "個體 2026 / 子公司 2027";
+            assuranceYear = "個體 2027 / 子公司 2029";
+          }
+        } else {
+          inventoryYear = envListed === 'yes' ? "2024 (環境部列管)" : "依供應鏈要求";
+          assuranceYear = envListed === 'yes' ? "依環境部查證時程" : "依供應鏈要求";
+        }
+
+        // IFRS 接軌時程 (文字)
+        let ifrsYear = "";
+        if (isListed) {
+          if (capital === '100up') ifrsYear = "2026 年實施（2027 年報揭露）";
+          else if (capital === '50to100') ifrsYear = "2027 年實施（2028 年報揭露）";
+          else ifrsYear = "2028 年實施（2029 年報揭露）";
+        } else {
+          ifrsYear = "暫無強制規定";
+        }
+
+        // 環境部碳費 (文字)
+        let carbonFeeStatus = "未達高排放列管門檻";
+        if (envListed === 'yes') {
+          carbonFeeStatus = "屬高排放列管事業：須每年完成盤查登錄，2025 年起適用碳費徵收與自主減碳計畫申報。";
+        }
+
+        // 歐盟跨境要求 (文字)
+        let euReq = "無直接歐盟法規強制規範。";
+        if (euExport === 'cbam') {
+          euReq = "適用 CBAM：2023-2025 為過渡期申報，2026/01 起正式實施並購買憑證。";
+        } else if (euExport === 'csrd') {
+          euReq = "適用 CSRD：須配合歐盟母公司/客戶提供符合 ESRS 之雙重重大性數據。";
+        }
+
+        // ----------------------------------------------------
+        // 甘特圖欄位精準定位計算 (Grid Start / Span - 2024=Col 1, 2029=Col 6)
+        // ----------------------------------------------------
+        
+        // 1. 個體盤查確信 (In-house)
+        let parentGantt = { start: 1, span: 1, label: "" };
+        if (isListed) {
+          if (isSteelOrCement || capital === '100up') {
+            parentGantt = { start: 1, span: 1, label: "個體盤查與確信已完成 (2023-2024)" };
+          } else if (capital === '50to100') {
+            parentGantt = { start: 2, span: 2, label: "個體盤查(2025) / 確信(2026)" };
+          } else {
+            parentGantt = { start: 3, span: 2, label: "個體盤查(2026) / 確信(2027)" };
+          }
+        }
+
+        // 2. 合併子公司盤查確信 (Subsidiaries)
+        let subGantt = { start: 1, span: 1, label: "" };
+        if (isListed) {
+          if (isSteelOrCement || capital === '100up') {
+            subGantt = { start: 2, span: 3, label: "子公司盤查(2025) / 確信(2027)" };
+          } else if (capital === '50to100') {
+            subGantt = { start: 3, span: 3, label: "子公司盤查(2026) / 確信(2028)" };
+          } else {
+            subGantt = { start: 4, span: 3, label: "子公司盤查(2027) / 確信(2029)" };
+          }
+        }
+
+        // 3. IFRS 年報專章
+        let ifrsGantt = { start: 1, span: 1, label: "" };
+        if (isListed) {
+          if (capital === '100up') {
+            ifrsGantt = { start: 3, span: 4, label: "2026 實施 (2027 起年報揭露)" };
+          } else if (capital === '50to100') {
+            ifrsGantt = { start: 4, span: 3, label: "2027 實施 (2028 起年報揭露)" };
+          } else {
+            ifrsGantt = { start: 5, span: 2, label: "2028 實施 (2029 起年報揭露)" };
+          }
+        }
+
+        return { 
+          reportDeadline, reportDetails, inventoryYear, assuranceYear, 
+          ifrsYear, carbonFeeStatus, euReq, isListed, isSteelOrCement,
+          parentGantt, subGantt, ifrsGantt
+        };
+      }, [orgType, capital, industry, envListed, euExport]);
+
+      const copyChecklist = () => {
+        const text = `【ESG 合規與永續診斷摘要】\n` +
+          `・組織：${orgType} | 資本額：${capital} | 產業：${industry}\n` +
+          `・永續報告書申報期限：${result.reportDeadline}\n` +
+          `・報告書規定：${result.reportDetails}\n` +
+          `・溫室氣體盤查：${result.inventoryYear}\n` +
+          `・第三方確信：${result.assuranceYear}\n` +
+          `・IFRS S1/S2 年報：${result.ifrsYear}\n` +
+          `・環境部碳費：${result.carbonFeeStatus}\n` +
+          `・歐盟跨境法規：${result.euReq}`;
+        navigator.clipboard.writeText(text);
+        alert('合規摘要已成功複製至剪貼簿！');
+      };
+
+      return (
+        <div className="min-h-screen pb-12">
+          {/* Header */}
+          <header className="bg-forest-800 text-white py-6 px-8 shadow-md">
+            <div className="max-w-7xl mx-auto flex justify-between items-center">
+              <div className="flex items-center space-x-3">
+                <i className="fa-solid font-bold text-sage text-2xl fa-leaf"></i>
+                <h1 className="text-2xl font-bold tracking-wide">ESG 企業合規與永續路徑索引工具</h1>
+              </div>
+              <span className="text-xs bg-forest-700 text-sage px-3 py-1 rounded-full border border-sage/30">
+                2026 法規標準
+              </span>
+            </div>
+          </header>
+
+          <main className="max-w-7xl mx-auto px-4 mt-6 space-y-6">
+            
+            {/* Filter Bar */}
+            <section className="bg-white p-6 rounded-xl shadow-sm border border-forest-100 print-hide">
+              <h2 className="text-lg font-semibold text-forest-800 mb-4 flex items-center gap-2">
+                <i className="fa-solid fa-sliders text-forest-600"></i> 企業背景快速篩選
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">1. 組織類型</label>
+                  <select value={orgType} onChange={(e)=>setOrgType(e.target.value)} className="w-full bg-forest-50 border border-forest-100 text-forest-800 text-sm rounded-lg p-2.5">
+                    <option value="listed_main">上市公司</option>
+                    <option value="listed_otc">上櫃公司</option>
+                    <option value="emerging">興櫃公司</option>
+                    <option value="unlisted_large">未上市櫃大型企業</option>
+                    <option value="sme">中小企業 (SME)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">2. 實收資本額</label>
+                  <select value={capital} onChange={(e)=>setCapital(e.target.value)} className="w-full bg-forest-50 border border-forest-100 text-forest-800 text-sm rounded-lg p-2.5">
+                    <option value="100up">≥ 100 億元</option>
+                    <option value="50to100">50 億 ～ 未滿 100 億元</option>
+                    <option value="20to50">20 億 ～ 未滿 50 億元</option>
+                    <option value="20under">未滿 20 億元</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">3. 所屬產業細分</label>
+                  <select value={industry} onChange={(e)=>setIndustry(e.target.value)} className="w-full bg-forest-50 border border-forest-100 text-forest-800 text-sm rounded-lg p-2.5">
+                    <option value="steel">鋼鐵金屬業 (第一階段列管)</option>
+                    <option value="cement">水泥及水泥製品業 (第一階段列管)</option>
+                    <option value="chemical">化學工業 / 石化業 (強制SASB/6月)</option>
+                    <option value="food">食品製造業 (強制SASB/6月)</option>
+                    <option value="finance">金融保險業 (強制SASB/投融資)</option>
+                    <option value="semi">半導體與電子零組件業</option>
+                    <option value="construction">營建土木與不動產業</option>
+                    <option value="shipping">航運物流與運輸業</option>
+                    <option value="general">其他一般製造 / 服務業</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">4. 環境部高排碳列管</label>
+                  <select value={envListed} onChange={(e)=>setEnvListed(e.target.value)} className="w-full bg-forest-50 border border-forest-100 text-forest-800 text-sm rounded-lg p-2.5">
+                    <option value="yes">是 (年排放 ≥ 2.5萬噸)</option>
+                    <option value="no">否</option>
+                    <option value="unknown">不確定</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">5. 歐盟跨境業務</label>
+                  <select value={euExport} onChange={(e)=>setEuExport(e.target.value)} className="w-full bg-forest-50 border border-forest-100 text-forest-800 text-sm rounded-lg p-2.5">
+                    <option value="cbam">出口 CBAM 產品至歐盟</option>
+                    <option value="csrd">屬歐盟母公司/客戶供應鏈</option>
+                    <option value="none">無歐盟業務</option>
+                  </select>
+                </div>
+              </div>
+            </section>
+
+            {/* 核心摘要卡片 */}
+            <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white p-5 rounded-xl border-l-4 border-forest-600 shadow-sm">
+                <div className="text-xs text-gray-500 font-bold">永續報告書強制申報時限</div>
+                <div className="text-lg font-bold text-forest-800 mt-1">{result.reportDeadline}</div>
+                <p className="text-xs text-gray-600 mt-2">{result.reportDetails}</p>
+              </div>
+
+              <div className="bg-white p-5 rounded-xl border-l-4 border-sage shadow-sm">
+                <div className="text-xs text-gray-500 font-bold">溫室氣體盤查與確信時程 (金管會)</div>
+                <div className="text-sm font-bold text-forest-800 mt-1">盤查：{result.inventoryYear}</div>
+                <div className="text-sm font-bold text-forest-700 mt-1">確信：{result.assuranceYear}</div>
+                {result.isSteelOrCement && (
+                  <p className="text-[11px] text-amberalert font-semibold mt-1">＊鋼鐵水泥業適用第一階段早鳥列管</p>
+                )}
+              </div>
+
+              <div className="bg-white p-5 rounded-xl border-l-4 border-amberalert shadow-sm">
+                <div className="text-xs text-gray-500 font-bold">IFRS S1/S2 永續年報專章</div>
+                <div className="text-base font-bold text-amberalert mt-1">{result.ifrsYear}</div>
+                <p className="text-xs text-gray-600 mt-2">直接納入股東會年報專章，提高法律責任等級</p>
+              </div>
+            </section>
+
+            {/* 核心修正：甘特圖對齊時間軸 (2024 – 2029 Gantt Timeline) */}
+            <section className="bg-white p-6 rounded-xl shadow-sm border border-forest-100">
+              <h2 className="text-lg font-semibold text-forest-800 mb-6 flex items-center gap-2">
+                <i className="fa-solid fa-timeline text-forest-600"></i> 動態合規進程甘特圖 (2024 – 2029 Gantt Chart)
+              </h2>
+              
+              <div className="space-y-6">
+                {/* 1. 上方年份刻度背景對齊 */}
+                <div className="grid grid-cols-6 gap-2 text-center font-bold text-xs text-forest-800 border-b pb-2">
+                  <div className="bg-forest-50/80 py-1 rounded">2024</div>
+                  <div className="bg-forest-50/80 py-1 rounded">2025</div>
+                  <div className="bg-forest-50/80 py-1 rounded">2026</div>
+                  <div className="bg-forest-50/80 py-1 rounded">2027</div>
+                  <div className="bg-forest-50/80 py-1 rounded">2028</div>
+                  <div className="bg-forest-50/80 py-1 rounded">2029</div>
+                </div>
+
+                {/* 2. 甘特圖資料列 */}
+                <div className="space-y-5 text-xs">
+                  
+                  {/* 列 A: 金管會盤查確信 (母公司/個體) */}
+                  <div>
+                    <div className="font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-forest-600"></span> 金管會：盤查與確信 (母公司/個體)
+                    </div>
+                    <div className="grid grid-cols-6 gap-2 h-7 bg-gray-50 rounded-lg p-1 items-center relative border border-gray-100">
+                      {result.isListed ? (
+                        <div 
+                          style={{ gridColumnStart: result.parentGantt.start, gridColumnEnd: `span ${result.parentGantt.span}` }}
+                          className="bg-forest-600 text-white text-center py-1 rounded font-semibold text-[11px] shadow-sm transition-all duration-300 truncate px-2"
+                        >
+                          {result.parentGantt.label}
+                        </div>
+                      ) : (
+                        <div className="col-span-6 text-gray-400 text-center text-[11px]">未上市櫃公司無金管會強制規範</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 列 B: 金管會盤查確信 (合併子公司) */}
+                  <div>
+                    <div className="font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-forest-700"></span> 金管會：盤查與確信 (合併子公司)
+                    </div>
+                    <div className="grid grid-cols-6 gap-2 h-7 bg-gray-50 rounded-lg p-1 items-center relative border border-gray-100">
+                      {result.isListed ? (
+                        <div 
+                          style={{ gridColumnStart: result.subGantt.start, gridColumnEnd: `span ${result.subGantt.span}` }}
+                          className="bg-forest-700 text-white text-center py-1 rounded font-semibold text-[11px] shadow-sm transition-all duration-300 truncate px-2"
+                        >
+                          {result.subGantt.label}
+                        </div>
+                      ) : (
+                        <div className="col-span-6 text-gray-400 text-center text-[11px]">未上市櫃公司無金管會強制規範</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 列 C: IFRS S1/S2 年報專章 */}
+                  <div>
+                    <div className="font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-amberalert"></span> 金管會：IFRS S1/S2 永續年報專章
+                    </div>
+                    <div className="grid grid-cols-6 gap-2 h-7 bg-gray-50 rounded-lg p-1 items-center relative border border-gray-100">
+                      {result.isListed ? (
+                        <div 
+                          style={{ gridColumnStart: result.ifrsGantt.start, gridColumnEnd: `span ${result.ifrsGantt.span}` }}
+                          className="bg-amberalert text-white text-center py-1 rounded font-semibold text-[11px] shadow-sm transition-all duration-300 truncate px-2"
+                        >
+                          {result.ifrsGantt.label}
+                        </div>
+                      ) : (
+                        <div className="col-span-6 text-gray-400 text-center text-[11px]">非上市櫃公司暫無強制接軌規定</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 列 D: 環境部碳費申報 */}
+                  <div>
+                    <div className="font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-amber-700"></span> 環境部：氣候變遷因應法與碳費徵收
+                    </div>
+                    <div className="grid grid-cols-6 gap-2 h-7 bg-gray-50 rounded-lg p-1 items-center relative border border-gray-100">
+                      {envListed === 'yes' ? (
+                        <>
+                          <div className="col-span-1 bg-amber-500 text-white text-center py-1 rounded font-semibold text-[11px] shadow-sm">
+                            盤查登錄
+                          </div>
+                          <div className="col-span-5 bg-amber-700 text-white text-center py-1 rounded font-semibold text-[11px] shadow-sm">
+                            碳費徵收與自主減碳計畫正式實施 (2025 起)
+                          </div>
+                        </>
+                      ) : (
+                        <div className="col-span-6 bg-gray-200 text-gray-500 text-center py-1 rounded text-[11px]">
+                          非高排放列管事業（免繳納碳費）
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 列 E: 歐盟跨境規範 (CBAM / CSRD) */}
+                  <div>
+                    <div className="font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-blue-600"></span> 歐盟跨境規範 (CBAM / CSRD)
+                    </div>
+                    <div className="grid grid-cols-6 gap-2 h-7 bg-gray-50 rounded-lg p-1 items-center relative border border-gray-100">
+                      {euExport === 'cbam' && (
+                        <>
+                          <div className="col-span-2 bg-blue-300 text-blue-950 text-center py-1 rounded font-semibold text-[11px] shadow-sm">
+                            2024-2025 CBAM 過渡期申報
+                          </div>
+                          <div className="col-span-4 bg-blue-600 text-white text-center py-1 rounded font-semibold text-[11px] shadow-sm">
+                            2026/01 起 CBAM 正式扣繳憑證
+                          </div>
+                        </>
+                      )}
+                      {euExport === 'csrd' && (
+                        <div className="col-span-6 bg-indigo-600 text-white text-center py-1 rounded font-semibold text-[11px] shadow-sm">
+                          CSRD / ESRS 雙重重大性永續數據全面對接期
+                        </div>
+                      )}
+                      {euExport === 'none' && (
+                        <div className="col-span-6 bg-gray-200 text-gray-500 text-center py-1 rounded text-[11px]">
+                          無直接歐盟跨境業務強制要求
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </section>
+
+            {/* 操作導出按鈕 */}
+            <section className="flex justify-end gap-3 print-hide">
+              <button onClick={copyChecklist} className="bg-forest-700 hover:bg-forest-800 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow flex items-center gap-2 transition">
+                <i className="fa-solid fa-copy"></i> 複製合規摘要 Checklist
+              </button>
+              <button onClick={()=>window.print()} className="bg-forest-600 hover:bg-forest-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow flex items-center gap-2 transition">
+                <i className="fa-solid fa-file-pdf"></i> 列印 / 導出 PDF 報告
+              </button>
+            </section>
+
+          </main>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<ESGApp />);
+  </script>
+</body>
+</html>
